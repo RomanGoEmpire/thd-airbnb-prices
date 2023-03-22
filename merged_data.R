@@ -1,4 +1,4 @@
-# Formatting----
+# Formatting -------------------------------------------------------------------
 WD = getwd()
 setwd(WD)
 
@@ -17,12 +17,12 @@ data$room_private <- as.factor(data$room_private)
 data$multi <- as.factor(data$multi)
 
 
-#----
+# Summary ----------------------------------------------------------------------
 
 summary(data)
 summary(data$city)
 
-# ----
+# realSum plotting ----
 
 splitted <- split(data, data$city)
 
@@ -37,9 +37,31 @@ paris <- splitted$paris$realSum
 rome <- splitted$rome$realSum
 vienna <- splitted$vienna$realSum
 
+# Boxplot ----
+boxplot(
+  amsterdam,
+  athens,
+  barcelona,
+  berlin,
+  budapest,
+  lisbon,
+  london,
+  paris,
+  rome,
+  vienna,
+  names = c(
+    "amsterdam",
+    "athens",
+    "barcelona",
+    "berlin",
+    "budapest",
+    "lisbon",
+    "london",
+    "paris",
+    "rome",
+    "vienna"
+  ),
+  log = "y"
+)
 
-boxplot(amsterdam,athens,barcelona,berlin,budapest,lisbon,london,paris,rome, vienna)
-
-
-
-
+# ----
