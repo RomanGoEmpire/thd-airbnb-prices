@@ -12,6 +12,11 @@ data <- read.csv(
 
 data$multi <- as.factor(data$multi)
 data$biz <- as.factor(data$biz)
+
+data$person_capacity <- as.factor(data$person_capacity)
+data$bedrooms <- as.factor(data$bedrooms)
+data$cleanliness_rating <- as.factor(data$cleanliness_rating)
+
 data$room_shared <- as.factor(data$room_shared)
 data$room_private <- as.factor(data$room_private)
 data$multi <- as.factor(data$multi)
@@ -21,6 +26,7 @@ data$multi <- as.factor(data$multi)
 
 summary(data)
 summary(data$city)
+
 
 # realSum plotting ----
 
@@ -60,8 +66,7 @@ boxplot(
     "paris",
     "rome",
     "vienna"
-  ),
-  log = "y"
+  )
 )
-
+plot(data$metro_dist,data$realSum)
 # ----
