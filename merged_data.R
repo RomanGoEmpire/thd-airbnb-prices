@@ -28,45 +28,40 @@ summary(data)
 summary(data$city)
 
 
-# realSum plotting ----
 
-splitted <- split(data, data$city)
 
-amsterdam <- splitted$amsterdam$realSum
-athens <- splitted$athens$realSum
-barcelona <- splitted$barcelona$realSum
-berlin <- splitted$berlin$realSum
-budapest <- splitted$budapest$realSum
-lisbon <- splitted$lisbon$realSum
-london <- splitted$london$realSum
-paris <- splitted$paris$realSum
-rome <- splitted$rome$realSum
-vienna <- splitted$vienna$realSum
+# grouping  --------------------------------------------------------------------
 
-# Boxplot ----
-boxplot(
-  amsterdam,
-  athens,
-  barcelona,
-  berlin,
-  budapest,
-  lisbon,
-  london,
-  paris,
-  rome,
-  vienna,
-  names = c(
-    "amsterdam",
-    "athens",
-    "barcelona",
-    "berlin",
-    "budapest",
-    "lisbon",
-    "london",
-    "paris",
-    "rome",
-    "vienna"
+data$cleanliness_rating <-
+  ifelse(
+    data$cleanliness_rating == 10 |
+      data$cleanliness_rating == 9 |
+      data$cleanliness_rating == 8,
+    data$cleanliness_rating,
+    99
   )
-)
-plot(data$metro_dist,data$realSum)
-# ----
+data$cleanliness_rating <- as.factor(data$cleanliness_rating)
+
+data$bedrooms <-
+  ifelse(data$bedrooms == 0 |
+           data$bedrooms == 1 |
+           data$bedrooms == 2,
+         data$bedrooms,
+         99)
+data$bedrooms <- as.factor(data$bedrooms)
+
+summary(data)
+
+# realSum plotting -------------------------------------------------------------
+
+boxplot(realSum ~ city, data, outline = FALSE)
+boxplot(realSum ~ day, data, outline = FALSE)
+boxplot(realSum ~ room_type, data, outline = FALSE)
+boxplot(realSum ~ room_shared, data, outline = FALSE)
+boxplot(realSum ~ room_private, data, outline = FALSE)
+boxplot(realSum ~ person_capacity, data, outline = FALSE)
+boxplot(realSum ~ host_is_superhost, data, outline = FALSE)
+boxplot(realSum ~ multi, data, outline = FALSE)
+boxplot(realSum ~ biz, data, outline = FALSE)
+boxplot(realSum ~ cleanliness_rating, data, outline = FALSE)
+boxplot(realSum ~ bedrooms, data, outline = FALSE)
