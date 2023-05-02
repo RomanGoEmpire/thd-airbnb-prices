@@ -151,6 +151,7 @@ median(data[, "lat"])
 
 # realSum plotting -------------------------------------------------------------
 
+par(mfrow=c(2,6))
 boxplot(realSum ~ city, data, outline = FALSE)
 boxplot(realSum ~ day, data, outline = FALSE)
 boxplot(realSum ~ room_type, data, outline = FALSE)
@@ -163,7 +164,32 @@ boxplot(realSum ~ biz, data, outline = FALSE)
 boxplot(realSum ~ cleanliness_rating, data, outline = FALSE)
 boxplot(realSum ~ bedrooms, data, outline = FALSE)
 
+
+
 # histograms plotting ----------------------------------------------------------
+
+hist(data$realSum, 
+     main="Real Sum", 
+     xlab = "Money in Euro", 
+     ylab = "Number AirBnB's")
+
+hist(data$guest_satisfaction_overall, 
+     main = "Guest Satisfaction Overall", 
+     xlab = "Rating", 
+     ylab = "Number of Guests",
+     breaks = seq(min(data$guest_satisfaction_overall), 
+                  max(data$guest_satisfaction_overall), 
+                  by = 1)
+     )
+
+hist(data$dist, 
+     main = "Distance City Center",
+     xlab = "Distance in km",
+     ylab = "Number AirBnB's")
+
+
+# barplots? --------------------------------------------------------------------
+
 
 # Zusammenhänge genauer untersuchen --------------------------------------------
 
