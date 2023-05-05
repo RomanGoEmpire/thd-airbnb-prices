@@ -53,8 +53,8 @@ data$bedrooms <- as.factor(data$bedrooms)
 summary(data)
 
 # realSum plotting -------------------------------------------------------------
-
 boxplot(realSum ~ city, data, outline = FALSE)
+par(mfrow = c(1,10))
 boxplot(realSum ~ day, data, outline = FALSE)
 boxplot(realSum ~ room_type, data, outline = FALSE)
 boxplot(realSum ~ room_shared, data, outline = FALSE)
