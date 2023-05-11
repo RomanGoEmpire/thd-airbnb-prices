@@ -173,7 +173,7 @@ hist(data$realSum,
      xlab = "Money in Euro", 
      ylab = "Number AirBnB's")
 
-hist(data$guest_satisfaction_overall, 
+hist(data$guest_satisfaction_overall , 
      main = "Guest Satisfaction Overall", 
      xlab = "Rating", 
      ylab = "Number of Guests",
@@ -189,11 +189,13 @@ hist(data$dist,
 
 
 # barplots? --------------------------------------------------------------------
-
+# mit citys evtl
 
 # Zusammenhänge genauer untersuchen --------------------------------------------
 
 # Korrelationen ----------------------------------------------------------------
+# nuuuuur metrisch mit metrisch; nix aus Boxplots
+
 
 # Kontingenztafel? -------------------------------------------------------------
 
@@ -208,8 +210,38 @@ hist(data$dist,
 #################################################
 
 #################################################   
-# k-nearest Neighbors?
+# Regression mit k-nearest Neighbors
 #################################################
+
+
+# k-Nearest Neighbors mit mehreren Einflussvariablen 
+
+# Laden des Packetes FNN
+library(FNN)
+
+# Trainingsdaten
+X.train <- Daten[,c("Girth","Height")]
+y.train <- Daten[,"Volume"]
+
+# Testdaten
+# Als Testdaten verwenden wir hier auch die Trainingsdaten
+X.test <- Daten[,c("Girth","Height")]
+
+
+# Berechnung der Prognosen mit k-Nearest Neighbors f?r k=12 
+
+model <- knn.reg(train=X.train, test = X.test, y=y.train, k = 12)
+prognosen <- model$pred
+prognosen
+
+
+# Berechnung der Prognosen mit k-Nearest Neighbors f?r k=12 mit Skalierung
+# Weil die Ergebnisse von (willk?rlich gew?hlten) Einheiten abh?ngen,
+# sollten die Daten der Einflussvariablen skaliert werden.
+
+model <- knn.reg(train=scale(X.train), test = scale(X.test), y=y.train, k = 12)
+prognosen <- model$pred
+prognosen
 
 #################################################   
 # Neuronale Netze
