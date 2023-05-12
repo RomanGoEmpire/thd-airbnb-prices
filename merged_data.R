@@ -1,16 +1,17 @@
 #################################################
-# Prüfungsstudienarbeit 
+# Prüfungsstudienarbeit
 # Roman Gerloff und Tabea Haas
+# Dataset: https://www.kaggle.com/datasets/thedevastator/airbnb-prices-in-european-cities
 #################################################
 
 # Externe Libraries ------------------------------------------------------------
 library(ggplot2)
-
+library(tree)
+library(ANN2)
 
 #################################################
 # Einlesen, Anpassen, Kontrolle der Daten
 #################################################
-
 
 # Formatting -------------------------------------------------------------------
 WD = getwd()
@@ -38,11 +39,8 @@ data$multi <- as.factor(data$multi)
 
 # Summary ----------------------------------------------------------------------
 
-summary(data)
+summary(data, maxsum = 50)
 summary(data$city)
-
-
-
 
 # grouping  --------------------------------------------------------------------
 
@@ -50,9 +48,10 @@ data$cleanliness_rating <-
   ifelse(
     data$cleanliness_rating == 10 |
       data$cleanliness_rating == 9 |
-      data$cleanliness_rating == 8,
-    data$cleanliness_rating,
-    99
+      data$cleanliness_rating == 8 |
+      data$cleanliness_rating == 7,
+    10,
+    data$cleanliness_rating
   )
 data$cleanliness_rating <- as.factor(data$cleanliness_rating)
 
@@ -65,19 +64,6 @@ data$bedrooms <-
 data$bedrooms <- as.factor(data$bedrooms)
 
 summary(data)
-
-
-
-
-# train and test data (70:30, random) ------------------------------------------
-
-n <- length(data[ ,1])
-index <- sample(1:n, n, replace = FALSE)
-data <- data[index, ]
-data.train <- data[1: 36195, ]
-data.test <- data[36196: 51707, ]
-data[1:10, ]
-
 
 # deskriptive Anylse Werte/Stuff -----------------------------------------------
 
@@ -95,15 +81,15 @@ sd(data[, "lat"])
 
 # robuste Alternative: Quartile
 quantile(data[, "realSum"])
-quantile(data[, "guest_satisfaction_overall"]) 
-quantile(data[, "dist"]) 
-quantile(data[, "metro_dist"]) 
-quantile(data[, "attr_index"]) 
-quantile(data[, "attr_index_norm"]) 
-quantile(data[, "rest_index"]) 
-quantile(data[, "rest_index_norm"]) 
-quantile(data[, "lng"]) 
-quantile(data[, "lat"]) 
+quantile(data[, "guest_satisfaction_overall"])
+quantile(data[, "dist"])
+quantile(data[, "metro_dist"])
+quantile(data[, "attr_index"])
+quantile(data[, "attr_index_norm"])
+quantile(data[, "rest_index"])
+quantile(data[, "rest_index_norm"])
+quantile(data[, "lng"])
+quantile(data[, "lat"])
 
 # Interquartilsabstände
 IQR(data[, "realSum"])
@@ -148,11 +134,12 @@ median(data[, "lng"])
 mean(data[, "lat"])
 median(data[, "lat"])
 
-
 # realSum plotting -------------------------------------------------------------
 
-par(mfrow=c(2,6))
+par(mfrow = c(2, 6))
 boxplot(realSum ~ city, data, outline = FALSE)
+
+par(mfrow = c(1, 10))
 boxplot(realSum ~ day, data, outline = FALSE)
 boxplot(realSum ~ room_type, data, outline = FALSE)
 boxplot(realSum ~ room_shared, data, outline = FALSE)
@@ -164,110 +151,181 @@ boxplot(realSum ~ biz, data, outline = FALSE)
 boxplot(realSum ~ cleanliness_rating, data, outline = FALSE)
 boxplot(realSum ~ bedrooms, data, outline = FALSE)
 
-
-
 # histograms plotting ----------------------------------------------------------
 
-hist(data$realSum, 
-     main="Real Sum", 
-     xlab = "Money in Euro", 
-     ylab = "Number AirBnB's")
+hist(data$realSum,
+     main = "Real Sum",
+     xlab = "Money in Euro",
+     ylab = "Number AirBnB's",
+)
 
-hist(data$guest_satisfaction_overall , 
-     main = "Guest Satisfaction Overall", 
-     xlab = "Rating", 
-     ylab = "Number of Guests",
-     breaks = seq(min(data$guest_satisfaction_overall), 
-                  max(data$guest_satisfaction_overall), 
-                  by = 1)
-     )
+hist(
+  data$guest_satisfaction_overall,
+  main = "Guest Satisfaction Overall",
+  xlab = "Rating",
+  ylab = "Number of Guests",
+  breaks = seq(
+    min(data$guest_satisfaction_overall),
+    max(data$guest_satisfaction_overall),
+    by = 1
+  )
+)
 
-hist(data$dist, 
+hist(data$dist,
      main = "Distance City Center",
      xlab = "Distance in km",
      ylab = "Number AirBnB's")
 
 
-# barplots? --------------------------------------------------------------------
-# mit citys evtl
-
 # Zusammenhänge genauer untersuchen --------------------------------------------
 
+
+
 # Korrelationen ----------------------------------------------------------------
-# nuuuuur metrisch mit metrisch; nix aus Boxplots
+
+cor(data$realSum, data$guest_satisfaction_overall)
+cor(data$realSum, data$dist)
+cor(data$realSum, data$metro_dist)
+cor(data$realSum, data$attr_index)
+cor(data$realSum, data$attr_index_norm)
+cor(data$realSum, data$rest_index)
+cor(data$realSum, data$rest_index_norm)
 
 
-# Kontingenztafel? -------------------------------------------------------------
+# Methods ----------------------------------------------------------------------
+
+shuffle_data <- function(data) {
+  n <- length(data[, 1])
+  index <- sample(1:n, n, replace = FALSE)
+  data <- data[index, ]
+  return(data)
+}
+
+train_test_divider <- function(data, percentage) {
+  n <- round(nrow(data) * percentage)
+  return (list(train = data[1:n,], test = data[(n + 1):nrow(data),]))
+}
 
 
+create_model_matrix <- function(target_and_predictors, data) {
+  matrix <- model.matrix(target_and_predictors, data = data)
+  matrix [, 1] # Remove Intercept
+  return(matrix)
+}
 
-#################################################              
+calculate_mean <- function(model, X, y) {
+  prediction <- predict(model, X)$predictions
+  mean = mean(abs(prediction - y))
+  return (mean)
+}
+
+
+devided_data <- train_test_divider(data, 0.7)
+train <- devided_data$train
+test <- devided_data$test
+
+
+target_and_predictors <-
+  realSum ~ city  + room_type + room_shared + room_private  + person_capacity +
+  host_is_superhost + multi + biz + guest_satisfaction_overall +
+  bedrooms + dist + metro_dist + attr_index + attr_index_norm + rest_index +
+  rest_index_norm
+
+# Not used:
+# cleanliness_rating + day  + lng + lat
+
+#################################################
+# Regression: Logistische Regression
+#################################################
+
+model <-
+  lm(target_and_predictors,
+     data = data)
+model
+
+y <- data$realSum
+prognosis <- model$fitted.values
+
+Error <- mean(abs(y - prognosis))
+Error
+
+#################################################
 # Erstellen eines Entscheidungsbaums
 #################################################
 
-#################################################   
-# Klassifikation: Logistische Regression
+tree <-
+  tree(
+    target_and_predictors,
+    data = train
+  )
+tuning <- cv.tree(tree, K = 5)
+t <- which.min(tuning$dev)
+Anzahl.Endknoten <- tuning$size[t]
+
+model <- prune.tree(tree, best = Anzahl.Endknoten)
+
+# Berechnung der Prognoseergebnisse auf den Testdaten:
+
+X.test <-
+  test[, c(
+    "city",
+    "room_type",
+    "room_shared",
+    "room_private",
+    "person_capacity",
+    "host_is_superhost",
+    "multi",
+    "biz",
+    "guest_satisfaction_overall",
+    "bedrooms",
+    "dist",
+    "metro_dist",
+    "attr_index",
+    "attr_index_norm",
+    "rest_index",
+    "rest_index_norm"
+  )]
+
+prognosen <- predict(model, X.test)
+
+# Berechnung des mittleren Prognosefehlers (MAD)
+
+y.test <- test[, "realSum"]
+mean = mean(abs(y.test - prognosen))
+
+plot(model)
+text(model)
+
+#################################################
+# k-nearest Neighbors?
 #################################################
 
-#################################################   
-# Regression mit k-nearest Neighbors
+
+
+
 #################################################
-
-
-# k-Nearest Neighbors mit mehreren Einflussvariablen 
-
-# Laden des Packetes FNN
-library(FNN)
-
-# Trainingsdaten
-X.train <- Daten[,c("Girth","Height")]
-y.train <- Daten[,"Volume"]
-
-# Testdaten
-# Als Testdaten verwenden wir hier auch die Trainingsdaten
-X.test <- Daten[,c("Girth","Height")]
-
-
-# Berechnung der Prognosen mit k-Nearest Neighbors f?r k=12 
-
-model <- knn.reg(train=X.train, test = X.test, y=y.train, k = 12)
-prognosen <- model$pred
-prognosen
-
-
-# Berechnung der Prognosen mit k-Nearest Neighbors f?r k=12 mit Skalierung
-# Weil die Ergebnisse von (willk?rlich gew?hlten) Einheiten abh?ngen,
-# sollten die Daten der Einflussvariablen skaliert werden.
-
-model <- knn.reg(train=scale(X.train), test = scale(X.test), y=y.train, k = 12)
-prognosen <- model$pred
-prognosen
-
-#################################################   
 # Neuronale Netze
 #################################################
 
+X <- create_model_matrix(target_and_predictors, train)
+y <- train$realSum
 
+X_test <- create_model_matrix(target_and_predictors, test)
+y_test <- test$realSum
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+model <-
+  neuralnetwork(
+    X,
+    y,
+    hidden.layers = c(16,8,4,2),
+    loss.type = "absolute",
+    learn.rates = 0.003,
+    n.epochs =  50,
+    batch.size = 32,
+    regression = TRUE,
+    verbose = TRUE
+  )
+mean_train <- calculate_mean(model, X, y)
+mean_train
+mean_test <- calculate_mean(model, X_test, y_test)
+mean_test
