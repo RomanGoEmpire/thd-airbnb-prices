@@ -8,6 +8,8 @@
 library(ggplot2)
 library(tree)
 library(ANN2)
+library(e1071)
+library(glmnet)
 
 #################################################
 # Einlesen, Anpassen, Kontrolle der Daten
@@ -141,7 +143,6 @@ par(mfrow = c(2, 6))
 boxplot(realSum ~ city, data, outline = FALSE)
 
 par(mfrow = c(1, 10))
-
 boxplot(realSum ~ day, data, outline = FALSE)
 boxplot(realSum ~ room_type, data, outline = FALSE)
 boxplot(realSum ~ room_shared, data, outline = FALSE)
@@ -153,7 +154,13 @@ boxplot(realSum ~ biz, data, outline = FALSE)
 boxplot(realSum ~ cleanliness_rating, data, outline = FALSE)
 boxplot(realSum ~ bedrooms, data, outline = FALSE)
 
+
+# Punktewolke plotting ---------------------------------------------------------
+
+# Fühlt sich eher irrelevant an
+
 # histograms plotting ----------------------------------------------------------
+# Ausbauen?
 
 hist(data$realSum,
      main = "Real Sum",
@@ -181,7 +188,7 @@ hist(data$dist,
 
 # Zusammenhänge genauer untersuchen --------------------------------------------
 
-
+# ?????
 
 # Korrelationen ----------------------------------------------------------------
 
@@ -235,6 +242,42 @@ target_and_predictors <-
 
 # Not used:
 # cleanliness_rating + day  + lng + lat
+
+#################################################
+# Variablenselektion mithilfe von LASSO
+#################################################
+
+X.train <- model.matrix(realSum ~. , data.train)
+X.train <- X.train[,-1]   # Entferne den Intercept
+summary(X.train)
+y.train <- data.train[,"realSum"]
+
+# 100-fache Durchführung von LASSO zur Variablenselektion
+m <- length(X.train[1,])
+total.numbers <- rep(0,m)
+RUNS <- 100
+
+for( run in 1:RUNS ){
+  
+  model.lasso <- cv.glmnet(X.train,y.train)
+  beta <- coef(model.lasso,s="lambda.1se")[-1,1]  # Vektor der Koeffizienten
+  total.numbers <- total.numbers + ifelse( beta != 0, 1, 0)  
+  
+}
+
+total.numbers <- as.matrix(total.numbers) 
+rownames(total.numbers) <- names(beta)     
+total.numbers
+
+Schwelle <- 10
+temp <- total.numbers[total.numbers[,1] >= Schwelle, 1]
+auswahl <- names(temp)
+
+# Die neuen Datensätze (funktioniert so leider noch nicht)
+
+#data.train.LASSO <- data.train[,c("realSum",auswahl)]
+#data.test.LASSO <- data.test[,c("realSum",auswahl)]
+
 
 #################################################
 # Regression: Logistische Regression
@@ -299,9 +342,29 @@ plot(model)
 text(model)
 
 #################################################
-# Support Vector Machine
+# Regression mit SVR (Support Vector Regression)
 #################################################
 
+# Definition der Tuning-Parameter
+
+# cc <- seq(-5,10,1)    
+# cg <- seq(-4,1,0.5) 
+
+# Berechnung des Modells
+
+# tuning <- tune.svm(realSum ~ xxxx, data=train, scale = TRUE, 
+#   type = "eps-regression", kernel = "radial", gamma = 10^cg, cost = 2^cc, 
+#   epsilon = 0.1, tunecontrol = tune.control(sampling = "cross",cross=5)))
+# print(tuning)
+# model <- tuning$best.model 
+
+# Berechnen von Prognosen
+# X.test <- test[,c("Geschlecht","Alter","Groesse")]
+# prognosis <- predict(model,X.test)
+
+# Berechnung des mittleren Prognosefehlers (MAD)
+# y.test <- test$realSum
+# mean(abs(y.test-prognosen)
 
 
 
