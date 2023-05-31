@@ -53,6 +53,7 @@ data$cleanliness_rating <-
     10,
     data$cleanliness_rating
   )
+
 data$cleanliness_rating <- as.factor(data$cleanliness_rating)
 
 data$bedrooms <-
@@ -140,6 +141,7 @@ par(mfrow = c(2, 6))
 boxplot(realSum ~ city, data, outline = FALSE)
 
 par(mfrow = c(1, 10))
+
 boxplot(realSum ~ day, data, outline = FALSE)
 boxplot(realSum ~ room_type, data, outline = FALSE)
 boxplot(realSum ~ room_shared, data, outline = FALSE)
@@ -297,7 +299,7 @@ plot(model)
 text(model)
 
 #################################################
-# k-nearest Neighbors?
+# Support Vector Machine
 #################################################
 
 
@@ -329,3 +331,4 @@ mean_train <- calculate_mean(model, X, y)
 mean_train
 mean_test <- calculate_mean(model, X_test, y_test)
 mean_test
+
