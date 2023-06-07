@@ -29,11 +29,7 @@ data <- read.csv(
 
 data$multi <- as.factor(data$multi)
 data$biz <- as.factor(data$biz)
-
 data$person_capacity <- as.factor(data$person_capacity)
-data$bedrooms <- as.factor(data$bedrooms)
-data$cleanliness_rating <- as.factor(data$cleanliness_rating)
-
 data$room_shared <- as.factor(data$room_shared)
 data$room_private <- as.factor(data$room_private)
 data$multi <- as.factor(data$multi)
@@ -44,31 +40,34 @@ data$multi <- as.factor(data$multi)
 summary(data, maxsum = 50)
 summary(data$city)
 
-# grouping  --------------------------------------------------------------------
+# Data Cleaning ----------------------------------------------------------------
 
-data$cleanliness_rating <-
-  ifelse(
-    data$cleanliness_rating == 10 |
-      data$cleanliness_rating == 9 |
-      data$cleanliness_rating == 8 |
-      data$cleanliness_rating == 7,
-    10,
-    data$cleanliness_rating
-  )
-
-data$cleanliness_rating <- as.factor(data$cleanliness_rating)
+data <- subset(data, data$realSum <= 1000)
+data <- subset(data, data$dist <= 12)
+data <- subset(data, data$attr_index <= 1500)
+data <- subset(data, data$rest_index <= 3500)
 
 data$bedrooms <-
   ifelse(data$bedrooms == 0 |
            data$bedrooms == 1 |
            data$bedrooms == 2,
          data$bedrooms,
-         99)
+         '3+')
 data$bedrooms <- as.factor(data$bedrooms)
+
+data$cleanliness_rating <-
+  ifelse(
+    data$cleanliness_rating == 10 |
+      data$cleanliness_rating == 9 |
+      data$cleanliness_rating == 8,
+    data$cleanliness_rating,
+    '7-'
+  )
+data$cleanliness_rating <- as.factor(data$cleanliness_rating)
 
 summary(data)
 
-# deskriptive Anylse Werte/Stuff -----------------------------------------------
+# deskriptive Analyse Werte ----------------------------------------------------
 
 # Standardabweichungen
 sd(data[, "realSum"])
@@ -106,7 +105,7 @@ IQR(data[, "rest_index_norm"])
 IQR(data[, "lng"])
 IQR(data[, "lat"])
 
-# Mean and Medin
+# Mean and Median
 mean(data[, "realSum"])
 median(data[, "realSum"])
 
@@ -139,7 +138,6 @@ median(data[, "lat"])
 
 # realSum plotting -------------------------------------------------------------
 
-par(mfrow = c(2, 6))
 boxplot(realSum ~ city, data, outline = FALSE)
 
 par(mfrow = c(1, 10))
@@ -161,6 +159,8 @@ boxplot(realSum ~ bedrooms, data, outline = FALSE)
 
 # histograms plotting ----------------------------------------------------------
 # Ausbauen?
+
+par(mfrow = c(2, 4))
 
 hist(data$realSum,
      main = "Real Sum",
@@ -185,6 +185,27 @@ hist(data$dist,
      xlab = "Distance in km",
      ylab = "Number AirBnB's")
 
+hist(data$metro_dist,
+     main = "Distance To Metro",
+     xlab = "Distance in km",
+     ylab = "Number AirBnB's")
+
+hist(data$attr_index,
+     main = "Attraction index",
+     xlab = "Rating",
+     ylab = "Number AirBnB's")
+hist(data$attr_index_norm,
+     main = "Attraction index normed",
+     xlab = "Rating",
+     ylab = "Number AirBnB's")
+hist(data$rest_index,
+     main = "Rest index",
+     xlab = "Rating",
+     ylab = "Number AirBnB's")
+hist(data$rest_index_norm,
+     main = "Attraction index normed",
+     xlab = "Rating",
+     ylab = "Number AirBnB's")
 
 # Zusammenhänge genauer untersuchen --------------------------------------------
 
@@ -199,7 +220,6 @@ cor(data$realSum, data$attr_index)
 cor(data$realSum, data$attr_index_norm)
 cor(data$realSum, data$rest_index)
 cor(data$realSum, data$rest_index_norm)
-
 
 # Methods ----------------------------------------------------------------------
 
@@ -228,60 +248,114 @@ calculate_mean <- function(model, X, y) {
   return (mean)
 }
 
+# Data shulffe and devided in test and train
 
+data <- shuffle_data(data)
 devided_data <- train_test_divider(data, 0.7)
 train <- devided_data$train
 test <- devided_data$test
 
+# Zielvariable und Einfluss variablen
 
 target_and_predictors <-
-  realSum ~ city  + room_type + room_shared + room_private  + person_capacity +
-  host_is_superhost + multi + biz + guest_satisfaction_overall +
-  bedrooms + dist + metro_dist + attr_index + attr_index_norm + rest_index +
-  rest_index_norm
+  realSum ~ city + day + room_type  + room_private  + person_capacity  + multi + biz + cleanliness_rating + guest_satisfaction_overall +
+  bedrooms + dist + metro_dist   + attr_index_norm + rest_index_norm
 
 # Not used:
-# cleanliness_rating + day  + lng + lat
+# lng + lat + attr_index  + rest_index + room_shared + host_is_superhost
 
 #################################################
 # Variablenselektion mithilfe von LASSO
 #################################################
 
-X.train <- model.matrix(realSum ~. , data.train)
-X.train <- X.train[,-1]   # Entferne den Intercept
-summary(X.train)
-y.train <- data.train[,"realSum"]
+library(glmnet)
 
-# 100-fache Durchführung von LASSO zur Variablenselektion
-m <- length(X.train[1,])
-total.numbers <- rep(0,m)
+X <- create_model_matrix(target_and_predictors, train)
+y <- train$realSum
+X_test <- create_model_matrix(target_and_predictors, test)
+y_test <- test$realSum
+
+summary(X)
+
+# Berechnung von LASSO mit der Standardeinstellung s="lambda.min"
+model.lasso <- cv.glmnet(X, y)
+coef(model.lasso, s = "lambda.min")
+
+# Wiederholung der Berechnung von LASSO mit der restriktiveren Einstellung s="lambda.1se"
+model.lasso <- cv.glmnet(X, y)
+coef(model.lasso, s = "lambda.1se")
+
+m <- length(X[1, ])
+total.numbers <- rep(0, m)
+
 RUNS <- 100
 
-for( run in 1:RUNS ){
-  
-  model.lasso <- cv.glmnet(X.train,y.train)
-  beta <- coef(model.lasso,s="lambda.1se")[-1,1]  # Vektor der Koeffizienten
-  total.numbers <- total.numbers + ifelse( beta != 0, 1, 0)  
+for (run in 1:RUNS) {
+  print(run)
+  model.lasso <- cv.glmnet(X, y)
+  beta <-
+    coef(model.lasso, s = "lambda.1se")[-1, 1]  # Vektor der Koeffizienten (ohne Intercept)
+  total.numbers <-
+    total.numbers + ifelse(beta != 0, 1, 0)  # Auswahl der Koeffizienten die ungleich Null sind
   
 }
 
-total.numbers <- as.matrix(total.numbers) 
-rownames(total.numbers) <- names(beta)     
+total.numbers <-
+  as.matrix(total.numbers)  # wie oft wurde welche Variable gewählt
+rownames(total.numbers) <-
+  names(beta)     # die Zeilen sollen die Namen der Variablen haben
 total.numbers
 
-Schwelle <- 10
-temp <- total.numbers[total.numbers[,1] >= Schwelle, 1]
+Schwelle <- 50
+temp <- total.numbers[total.numbers[, 1] >= Schwelle, 1]
 auswahl <- names(temp)
-
-# Die neuen Datensätze (funktioniert so leider noch nicht)
-
-#data.train.LASSO <- data.train[,c("realSum",auswahl)]
-#data.test.LASSO <- data.test[,c("realSum",auswahl)]
-
 
 #################################################
 # Regression: Logistische Regression
 #################################################
+
+
+train_model <- function(city, data) {
+  model <-
+    lm(
+      realSum ~ day + room_type  + room_private  + person_capacity  + multi + biz + cleanliness_rating + guest_satisfaction_overall +
+        bedrooms + dist + metro_dist   + attr_index_norm + rest_index_norm
+      ,
+      data = data
+    )
+  model
+  
+  y <- data$realSum
+  prognosis <- model$fitted.values
+  
+  Error <- mean(abs(y - prognosis))
+  print(city)
+  print(Error)
+}
+
+data_amsterdam <- subset(data, data$city == "amsterdam")
+train_model("amsterdam", data_amsterdam)
+data_athens <- subset(data, data$city == "athens")
+train_model("athens", data_athens)
+data_barcelona <- subset(data, data$city == "barcelona")
+train_model("barcelona", data_barcelona)
+data_berlin <- subset(data, data$city == "berlin")
+train_model("berlin", data_berlin)
+data_budapest <- subset(data, data$city == "budapest")
+train_model("budapest", data_budapest)
+data_lisbon <- subset(data, data$city == "lisbon")
+train_model("lisbon", data_lisbon)
+data_london <- subset(data, data$city == "london")
+train_model("london", data_london)
+data_paris <- subset(data, data$city == "paris")
+train_model("paris", data_paris)
+data_rome <- subset(data, data$city == "rome")
+train_model("rome", data_rome)
+data_vienna <- subset(data, data$city == "vienna")
+train_model("vienna", data_vienna)
+
+
+# All Cities
 
 model <-
   lm(target_and_predictors,
@@ -299,21 +373,18 @@ Error
 #################################################
 
 tree <-
-  tree(
-    target_and_predictors,
-    data = train
-  )
+  tree(target_and_predictors,
+       data = train)
 tuning <- cv.tree(tree, K = 5)
 t <- which.min(tuning$dev)
 Anzahl.Endknoten <- tuning$size[t]
 
 model <- prune.tree(tree, best = Anzahl.Endknoten)
 
-# Berechnung der Prognoseergebnisse auf den Testdaten:
-
 X.test <-
   test[, c(
     "city",
+    'day',
     "room_type",
     "room_shared",
     "room_private",
@@ -321,6 +392,62 @@ X.test <-
     "host_is_superhost",
     "multi",
     "biz",
+    "cleanliness_rating",
+    "guest_satisfaction_overall",
+    "bedrooms",
+    "dist",
+    "metro_dist",
+    "attr_index",
+    "attr_index_norm",
+    "rest_index",
+    "rest_index_norm",
+    "lng",
+    "lat"
+  )]
+
+prognosen <- predict(model, X.test)
+
+y.test <- test[, "realSum"]
+mean = mean(abs(y.test - prognosen))
+print(mean)
+
+plot(model)
+text(model)
+
+#################################################
+# Regression mit SVR (Support Vector Regression)
+#################################################
+
+cc <- seq(-5, 10, 1)
+cg <- seq(-4, 1, 0.5)
+
+tuning <-
+  tune.svm(
+    target_and_predictors,
+    data = train,
+    scale = TRUE,
+    type = "eps-regression",
+    kernel = "radial",
+    gamma = 10 ^ cg,
+    cost = 2 ^ cc,
+    epsilon = 0.1,
+    tunecontrol = tune.control(sampling = "cross", cross = 5000)
+  )
+print(tuning)
+model <- tuning$best.model
+
+X.test <-
+  test[, c(
+    "city",
+    'day',
+    "room_type",
+    "room_shared",
+    "room_private",
+    "person_capacity",
+    "host_is_superhost",
+    "multi",
+    "biz",
+    "cleanliness_rating",
     "guest_satisfaction_overall",
     "bedrooms",
     "dist",
@@ -330,41 +457,10 @@ X.test <-
     "rest_index",
     "rest_index_norm"
   )]
+prognosis <- predict(model, X.test)
 
-prognosen <- predict(model, X.test)
-
-# Berechnung des mittleren Prognosefehlers (MAD)
-
-y.test <- test[, "realSum"]
-mean = mean(abs(y.test - prognosen))
-
-plot(model)
-text(model)
-
-#################################################
-# Regression mit SVR (Support Vector Regression)
-#################################################
-
-# Definition der Tuning-Parameter
-
-# cc <- seq(-5,10,1)    
-# cg <- seq(-4,1,0.5) 
-
-# Berechnung des Modells
-
-# tuning <- tune.svm(realSum ~ xxxx, data=train, scale = TRUE, 
-#   type = "eps-regression", kernel = "radial", gamma = 10^cg, cost = 2^cc, 
-#   epsilon = 0.1, tunecontrol = tune.control(sampling = "cross",cross=5)))
-# print(tuning)
-# model <- tuning$best.model 
-
-# Berechnen von Prognosen
-# X.test <- test[,c("Geschlecht","Alter","Groesse")]
-# prognosis <- predict(model,X.test)
-
-# Berechnung des mittleren Prognosefehlers (MAD)
-# y.test <- test$realSum
-# mean(abs(y.test-prognosen)
+y.test <- train$realSum
+mean(abs(y.test - prognosen))
 
 
 
@@ -372,26 +468,87 @@ text(model)
 # Neuronale Netze
 #################################################
 
+data <- shuffle_data(data)
+devided_data <- train_test_divider(data, 0.7)
+train <- devided_data$train
+test <- devided_data$test
+
 X <- create_model_matrix(target_and_predictors, train)
 y <- train$realSum
 
 X_test <- create_model_matrix(target_and_predictors, test)
 y_test <- test$realSum
 
-model <-
-  neuralnetwork(
-    X,
-    y,
-    hidden.layers = c(16,8,4,2),
-    loss.type = "absolute",
-    learn.rates = 0.003,
-    n.epochs =  50,
-    batch.size = 32,
-    regression = TRUE,
-    verbose = TRUE
-  )
+model <- neuralnetwork(
+  X,
+  y,
+  hidden.layers = c(32, 16, 8, 4),
+  loss.type = "huber",
+  learn.rates = 0.01,
+  n.epochs = 100,
+  batch.size = 512,
+  regression = TRUE,
+  verbose = TRUE
+)
+
 mean_train <- calculate_mean(model, X, y)
 mean_train
 mean_test <- calculate_mean(model, X_test, y_test)
 mean_test
 
+
+# Crazy shit -------------------------------------------------------------------
+
+# Define the combinations
+best_combination <- NULL
+best_test <- 1000
+
+combinations <- expand.grid(
+  layers = list(c(16, 8, 4), c(64, 32), c(16, 8, 8, 4), c(32, 16, 16, 8, 8, 4)),
+  loss_types = list("absolute", "squared", "huber", "pseudo-huber"),
+  learning_rates = list(0.01, 0.003, 0.001),
+  epochs = list(50, 100, 250),
+  batch_sizes = list(128, 256, 512)
+)
+
+# Define a function to train the neural network and return the performance metric
+
+for (i in (c(1:432))) {
+  current_combination <- combinations[i, ]
+  
+  hidden_layer <- unlist(current_combination$layers)
+  loss_type <- unlist(current_combination$loss_types)
+  learning_rate <- unlist(current_combination$learning_rates)
+  epoch <- unlist(current_combination$epochs)
+  batch_size <- unlist(current_combination$batch_sizes)
+  
+  model <-
+    neuralnetwork(
+      X,
+      y,
+      hidden.layers = hidden_layer,
+      regression = TRUE,
+      loss.type = loss_type,
+      learn.rates = learning_rate,
+      n.epochs = epoch,
+      batch.size = batch_size,
+      verbose = TRUE
+    )
+  
+  mean_train <- calculate_mean(model, X, y)
+  mean_test <- calculate_mean(model, X_test, y_test)
+  
+  print(i)
+  print(current_combination)
+  print(mean_train)
+  print(mean_test)
+  
+  
+  if (mean_test < best_test) {
+    best_combination <- current_combination
+    best_test <- mean_test
+  }
+}
+
+best_combination
+best_test
