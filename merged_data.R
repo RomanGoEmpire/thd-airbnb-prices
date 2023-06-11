@@ -10,6 +10,7 @@ library(tree)
 library(ANN2)
 library(e1071)
 library(glmnet)
+library(correlation)
 
 #################################################
 # Einlesen, Anpassen, Kontrolle der Daten
@@ -157,7 +158,9 @@ boxplot(realSum ~ bedrooms, data, outline = FALSE)
 
 # Punktewolke plotting ---------------------------------------------------------
 
-# Fühlt sich eher irrelevant an
+# Kein Merwert, da nur Blöcke porträtiert werden
+
+# Korrelationstabelle -----------------------------------------------------------
 
 # histograms plotting ----------------------------------------------------------
 # Ausbauen?
@@ -188,7 +191,7 @@ hist(data$dist,
 
 # Zusammenhänge genauer untersuchen --------------------------------------------
 
-# ?????
+# ???
 
 # Korrelationen ----------------------------------------------------------------
 
