@@ -1,6 +1,6 @@
 #################################################
 # Prüfungsstudienarbeit
-# Roman Gerloff () 
+# Roman Gerloff (221008060) 
 # Tabea Haas (00815861)
 # Dataset: https://www.kaggle.com/datasets/thedevastator/airbnb-prices-in-european-cities
 #################################################
@@ -107,7 +107,6 @@ boxplot(realSum ~ multi, data, outline = FALSE)
 boxplot(realSum ~ biz, data, outline = FALSE)
 boxplot(realSum ~ cleanliness_rating, data, outline = FALSE)
 boxplot(realSum ~ bedrooms, data, outline = FALSE)
-
 # Ergebnisse: Wochentage/-end scheint keinen Einfluss auf den Preis zu haben;
 # AirBnB's, bei denen man ein ganzes aus/ Apartment hat, scheinen einen höheren 
 # Preis zu haben, ebenso tragen mehr Schlafgelegenheiten und Personenkapazität hierzu bei.
@@ -174,7 +173,7 @@ hist(data$rest_index_norm,
      xlab = "Rating",
      ylab = "Number AirBnB's")
 
-# Ergebnisse: ??? Kann man hier noch mehr sagen ????????????????????????????????
+# Ergebnisse: Alle Variablen haben eine extreme Schieflage
 # Anpassen der Daten für mehr Aussagekraft und Übersichtlichkeit der Histogramme 
 
 # Korrelationskoeffizienten ----------------------------------------------------
@@ -267,12 +266,12 @@ test <- devided_data$test
 
 # Speichern der Ziel- und Einflussvariable(n), um Redundanz zu vermeiden
 target_and_predictors <-
-  realSum ~ city + day + room_type  + room_private  + person_capacity  + multi +
-  biz + cleanliness_rating + guest_satisfaction_overall +bedrooms + dist + 
-  metro_dist   + attr_index_norm + rest_index_norm
+  realSum ~ city + day + room_type + room_shared  + room_private  + person_capacity  + multi +
+  biz + cleanliness_rating + guest_satisfaction_overall + bedrooms + dist + 
+  metro_dist + attr_index + attr_index_norm + rest_index_norm 
 
 # Nich verwendete Variablen für nachfolgenden Berechnungen:
-# lng + lat + attr_index  + rest_index + room_shared + host_is_superhost
+# rest_index + host_is_superhost + lng + lat
 # Begründung: LASSO etc. 
 
 
@@ -320,6 +319,10 @@ for (run in 1:RUNS) {
   
 }
 
+total.numbers <- as.matrix(total.numbers)  # wie oft wurde welche Variable gewählt
+rownames(total.numbers) <- names(beta)     # die Zeilen sollen die Namen der Variablen haben
+total.numbers
+
 # Ergebnisse: 
 
 
@@ -339,7 +342,7 @@ Error <- mean(abs(y - prognosis))
 Error
 
 # Ergebnis: Durchschnittliche absolute Abweichung zwischen den vom Modell vorhergesagten 
-# Preisen und den tatsächlichen Preisen beträgt in etwa 72.54€ (gerundet)
+# Preisen und den tatsächlichen Preisen beträgt in etwa 72.55€ (gerundet)
 
 
 
@@ -377,7 +380,6 @@ X.test <-
     "room_shared",
     "room_private",
     "person_capacity",
-    "host_is_superhost",
     "multi",
     "biz",
     "cleanliness_rating",
@@ -387,10 +389,7 @@ X.test <-
     "metro_dist",
     "attr_index",
     "attr_index_norm",
-    "rest_index",
-    "rest_index_norm",
-    "lng",
-    "lat"
+    "rest_index_norm"
   )]
 
 # Berechnung des mittleren Prognosefehlers (MAD) 
@@ -399,20 +398,11 @@ y.test <- test[, "realSum"]
 mean = mean(abs(y.test - prognosen))
 print(mean)
 
-# Ergebnis: Durchschnittliche absolute Abweichung zwischen den vom Modell vorhergesagten 
-# Preisen und den tatsächlichen Preisen beträgt in etwa 82.24€ (gerundet)
+# Ergebnis: MAE beträgt in etwa 81.51€  (gerundet)
 
 #################################################
 # Neuronale Netze
 #################################################
-
-# Zufällige Änderung der Reihenfolge der Daten
-data <- shuffle_data(data)
-
-# Aufteilung in Trainings- und Testdaten
-devided_data <- train_test_divider(data, 0.7)
-train <- devided_data$train
-test <- devided_data$test
 
 # Erstellen einer Matrix für die Trainingsdaten
 X <- create_model_matrix(target_and_predictors, train)
@@ -431,10 +421,10 @@ y_test <- test$realSum
 model <- neuralnetwork(
   X,
   y,
-  hidden.layers = c(32, 16, 8, 4),
+  hidden.layers = c(32,16,8,4),
   loss.type = "huber",
-  learn.rates = 0.01,
-  n.epochs = 100,
+  learn.rates = 0.003,
+  n.epochs = 500,
   batch.size = 512,
   regression = TRUE,
   verbose = TRUE # Fortschrittsanzeige während des Trainings
@@ -449,8 +439,7 @@ mean_train
 mean_test <- calculate_MAE(model, X_test, y_test)
 mean_test
 
-# Ergebnis: Durchschnittlicher absoluter Fehler beträgt in etwa 
-# 57.76€ für den Trainings- und 58.95€ für den Testdatendatensatz (gerundet)
+# Ergebnis: MAE beträgt 56.39€ für den Trainings- und 57.73€ für den Testdatendatensatz (gerundet)
 # Geringste Abweichung unter den verwendeten Lernverfahren
 
 # Berechnung der Prognosegüte mittels MAPE
@@ -460,64 +449,5 @@ mean_test <- calculate_MAPE(model, X_test, y_test)
 mean_test
 
 # Ergebnis: durchschnittliche prozentuale Abweichung der Vorhersagen 
-# vom tatsächlichen Preis beträgt in etwa 23.83% bzw. 24.21% 
-
-
-
-# Crazy shit -------------------------------------------------------------------
-
-# Define the combinations
-best_combination <- NULL
-best_test <- 1000
-
-combinations <- expand.grid(
-  layers = list(c(16, 8, 4), c(64, 32), c(16, 8, 8, 4), c(32, 16, 16, 8, 8, 4)),
-  loss_types = list("absolute", "squared", "huber", "pseudo-huber"),
-  learning_rates = list(0.01, 0.003, 0.001),
-  epochs = list(50, 100, 250),
-  batch_sizes = list(128, 256, 512)
-)
-
-# Define a function to train the neural network and return the performance metric
-
-for (i in (c(1:432))) {
-  current_combination <- combinations[i, ]
-  
-  hidden_layer <- unlist(current_combination$layers)
-  loss_type <- unlist(current_combination$loss_types)
-  learning_rate <- unlist(current_combination$learning_rates)
-  epoch <- unlist(current_combination$epochs)
-  batch_size <- unlist(current_combination$batch_sizes)
-  
-  model <-
-    neuralnetwork(
-      X,
-      y,
-      hidden.layers = hidden_layer,
-      regression = TRUE,
-      loss.type = loss_type,
-      learn.rates = learning_rate,
-      n.epochs = epoch,
-      batch.size = batch_size,
-      verbose = TRUE
-    )
-  
-  mean_train <- calculate_MAE(model, X, y)
-  mean_test <- calculate_MAE(model, X_test, y_test)
-  
-  print(i)
-  print(current_combination)
-  print(mean_train)
-  print(mean_test)
-  
-  
-  if (mean_test < best_test) {
-    best_combination <- current_combination
-    best_test <- mean_test
-  }
-}
-
-best_combination
-best_test
-
+# vom tatsächlichen Preis beträgt in etwa 23.73% bzw. 23.89% 
 
